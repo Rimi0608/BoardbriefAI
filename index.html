@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BoardBrief AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- 1. Chart.js library is still needed -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- The react-chartjs-2 library is no longer needed and has been removed -->
+</head>
+<body>
+    <div id="root"></div>
+    {% raw %}
+
+    <script type="text/babel">
+        // main.js
+
+        // Use React hooks and components from the global window object (loaded via CDN)
+        const { useState, useCallback, useEffect, useRef } = React;
+        // We no longer need to import anything from ReactChartjs2
+        const ChartJS = window.Chart;
+
+        // Register Chart.js components. This is still necessary.
+        ChartJS.register(ChartJS.ArcElement, ChartJS.Tooltip, ChartJS.Legend);
+
+        // Helper components (unchanged)
+        const Icon = ({ path, className = "w-6 h-6" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+                <path strokeLinecap="round" strokeLinejoin="round" d={path} />
+            </svg>
+        );
+
+        const Header = () => (
+            <header className="bg-white shadow-sm">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex justify-between items-center py-4">
+                        <div className="flex items-center space-x-2">
+                            <div className="bg-blue-600 p-2 rounded-lg">
+                                <Icon path="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-1.621-1.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h9.75a2.25 2.25 0 012.25 2.25z" className="w-6 h-6 text-white" />
+                            </div>
+                            <span className="text-xl font-bold text-gray-800">BoardBrief AI</span>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                            <Icon path="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" className="w-6 h-6 text-gray-500" />
+                            <Icon path="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" className="w-6 h-6 text-gray-500" />
+                        </div>
+                    </div>
+                </div>
+            </header>
+        );
+
+        const ProjectNameInput = ({ projectName, setProjectName }) => (
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <label htmlFor="project-name" className="block text-sm font-medium text-gray-700 mb-2">Project Name</label>
+                <input
+                    type="text"
+                    id="project-name"
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="e.g., Q3 Financial Report"
+                />
+            </div>
+        );
+
+        const PresentationTemplates = ({ selectedTemplate, setSelectedTemplate }) => {
+            const templates = [
+                { name: 'Executive Summary', desc: 'Clean, minimal design focused on key metrics and strategic insights', tag: 'Corporate', img: 'https://placehold.co/600x400/a3e635/ffffff?text=Executive+Summary' },
+                { name: 'Financial Dashboard', desc: 'Data-heavy layout with emphasis on charts and financial metrics', tag: 'Finance', img: 'https://placehold.co/600x400/60a5fa/ffffff?text=Financial+Dashboard' },
+                { name: 'Strategy Overview', desc: 'Balanced layout for strategic initiatives and roadmaps', tag: 'Strategy', img: 'https://placehold.co/600x400/f87171/ffffff?text=Strategy+Overview' },
+                { name: 'Sales Performance', desc: 'Dynamic layout highlighting revenue trends and targets', tag: 'Sales', img: 'https://placehold.co/600x400/fbbf24/ffffff?text=Sales+Performance' },
+                { name: 'Project Status', desc: 'Timeline-focused design for project updates and milestones', tag: 'Operations', img: 'https://placehold.co/600x400/4ade80/ffffff?text=Project+Status' },
+                { name: 'Market Analysis', desc: 'Comprehensive layout for market research and competitive insights', tag: 'Research', img: 'https://placehold.co/600x400/c084fc/ffffff?text=Market+Analysis' },
+            ];
+
+            const getTagColor = (tag) => {
+                switch (tag) {
+                    case 'Corporate': return 'bg-blue-100 text-blue-800';
+                    case 'Finance': return 'bg-green-100 text-green-800';
+                    case 'Strategy': return 'bg-purple-100 text-purple-800';
+                    case 'Sales': return 'bg-orange-100 text-orange-800';
+                    case 'Operations': return 'bg-yellow-100 text-yellow-800';
+                    case 'Research': return 'bg-teal-100 text-teal-800';
+                    default: return 'bg-gray-100 text-gray-800';
+                }
+            };
+
+            return (
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-lg font-semibold text-gray-800">Choose Your Presentation Template</h2>
+                        <button className="text-sm text-blue-600 font-medium flex items-center space-x-1">
+                            <Icon path="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.438.995s.145.755.438.995l1.003.827c.48.398.668 1.03.26 1.431l-1.296 2.247a1.125 1.125 0 01-1.37.49l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.063-.374-.313-.686-.645-.87a6.52 6.52 0 01-.22-.127c-.324-.196-.72-.257-1.075-.124l-1.217.456a1.125 1.125 0 01-1.37-.49l-1.296-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.437-.995s-.145-.755-.437-.995l-1.004-.827a1.125 1.125 0 01-.26-1.431l1.296-2.247a1.125 1.125 0 011.37-.49l1.217.456c.355.133.75.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.213-1.28z" className="w-4 h-4" />
+                            <span>Customize Template</span>
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {templates.map(template => (
+                            <div
+                                key={template.name}
+                                onClick={() => setSelectedTemplate(template.name)}
+                                className={`rounded-lg border-2 p-4 cursor-pointer transition-all ${selectedTemplate === template.name ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-400'}`}
+                            >
+                                <img src={template.img} alt={template.name} className="w-full h-32 object-cover rounded-md mb-4" />
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h3 className="font-semibold text-gray-800">{template.name}</h3>
+                                        <p className="text-sm text-gray-500 mt-1">{template.desc}</p>
+                                        <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full mt-3 ${getTagColor(template.tag)}`}>{template.tag}</span>
+                                    </div>
+                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedTemplate === template.name ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}`}>
+                                        {selectedTemplate === template.name && <Icon path="M4.5 12.75l6 6 9-13.5" className="w-3 h-3 text-white" />}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const FileUpload = ({ setFiles, setProcessing, setGeneratedContent, setApiError, prompt }) => {
+            const handleFileChange = (event) => {
+                const selectedFiles = Array.from(event.target.files);
+                if (selectedFiles.length > 0) {
+                    setFiles(selectedFiles);
+                    handleUpload(selectedFiles);
+                }
+            };
+
+            const handleUpload = async (filesToUpload) => {
+                if (filesToUpload.length === 0) return;
+                setProcessing(true);
+                setGeneratedContent(null);
+                setApiError(null); 
+
+                const formData = new FormData();
+                filesToUpload.forEach(file => {
+                    formData.append('files', file);
+                });
+                formData.append('prompt', prompt);
+
+                try {
+                    const response = await fetch('http://127.0.0.1:5001/api/generate', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    if (!response.ok) {
+                         const errData = await response.json();
+                        throw new Error(errData.error || `HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    setGeneratedContent(data);
+
+                } catch (error) {
+                    console.error("Error uploading files:", error);
+                    setApiError(error.message);
+                } finally {
+                    setProcessing(false);
+                }
+            };
+
+            return (
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                    <h2 className="text-lg font-semibold text-gray-800 mb-2 text-center">Upload Your Documents</h2>
+                    <p className="text-sm text-gray-500 text-center mb-6">Support for Excel, CSV, and PDF files up to 50MB</p>
+                    <div className="border-2 border-dashed rounded-lg p-12 text-center border-gray-300">
+                        <div className="flex flex-col items-center">
+                            <Icon path="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" className="w-12 h-12 text-gray-400 mb-4" />
+                            <p className="text-gray-600 mb-2">Click the button to select files</p>
+                            <label className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer">
+                                Browse Files
+                                <input 
+                                   type="file" 
+                                   multiple 
+                                   className="hidden" 
+                                   onChange={handleFileChange} 
+                                   accept=".pdf,.csv,.xls,.xlsx"
+                                />
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const ProcessingStatus = () => {
+            const steps = [
+                "Document parsing complete",
+                "Data extraction finished",
+                "Generating insights and visualizations...",
+                "Creating presentation slides..."
+            ];
+            const [completedSteps, setCompletedSteps] = useState([]);
+            const [progress, setProgress] = useState(0);
+
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setProgress(prev => {
+                        if (prev >= 100) {
+                            clearInterval(interval);
+                            return 100;
+                        }
+                        return prev + 1;
+                    });
+                }, 30);
+
+                steps.forEach((_, index) => {
+                    setTimeout(() => {
+                        setCompletedSteps(prev => [...prev, index]);
+                    }, (index + 1) * 750);
+                });
+
+                return () => clearInterval(interval);
+            }, []);
+
+            return (
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-lg font-semibold text-gray-800">Processing Documents</h2>
+                        <span className="text-sm text-gray-500">{Math.floor(progress / 10)} slides generated</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
+                        <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
+                    </div>
+                    <div className="space-y-2">
+                        {steps.map((step, index) => (
+                            <div key={step} className="flex items-center space-x-2 text-sm text-gray-600">
+                                {completedSteps.includes(index) ? (
+                                    <Icon path="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" className="w-5 h-5 text-green-500" />
+                                ) : (
+                                    <div className="w-5 h-5 border-2 border-gray-300 rounded-full animate-spin"></div>
+                                )}
+                                <span>{step}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const GeneratedContent = ({ content }) => {
+            const [activeSlide, setActiveSlide] = useState(0);
+            // 2. Create a ref for the canvas element and another for the chart instance
+            const chartRef = useRef(null);
+            const chartInstanceRef = useRef(null);
+
+            // 3. Use an effect to create/update the chart when the data changes
+            useEffect(() => {
+                if (content.insights && content.insights.labels && content.insights.labels.length > 0 && chartRef.current) {
+                    // Destroy the previous chart instance if it exists
+                    if (chartInstanceRef.current) {
+                        chartInstanceRef.current.destroy();
+                    }
+                    
+                    const ctx = chartRef.current.getContext('2d');
+                    chartInstanceRef.current = new ChartJS(ctx, {
+                        type: 'pie',
+                        data: content.insights,
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                },
+                            }
+                        }
+                    });
+                }
+                
+                // Cleanup function to destroy chart on component unmount
+                return () => {
+                    if (chartInstanceRef.current) {
+                        chartInstanceRef.current.destroy();
+                        chartInstanceRef.current = null;
+                    }
+                }
+            }, [content.insights]); // Rerun effect if insights data changes
+
+            if (!content || !content.slides || content.slides.length === 0) {
+                return (
+                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mt-8 text-center">
+                        <h2 className="text-xl font-bold text-gray-800">No Content Generated</h2>
+                        <p className="text-gray-500 mt-2">The AI could not generate a presentation. Please check the uploaded files or try again.</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mt-8">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-6">Generated Presentation</h2>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-2">
+                            <h3 className="text-xl font-semibold text-gray-700 mb-4">Slides Preview</h3>
+                            <div className="bg-gray-100 rounded-lg p-4 h-[400px] flex items-center justify-center">
+                                 <div className="w-full h-full bg-white shadow-lg rounded-md p-8">
+                                    <h4 className="text-2xl font-bold mb-4">{content.slides[activeSlide].title}</h4>
+                                    <p>{content.slides[activeSlide].content}</p>
+                                 </div>
+                            </div>
+                            <div className="flex justify-center items-center mt-4 space-x-2">
+                                 <button onClick={() => setActiveSlide(p => Math.max(0, p - 1))} disabled={activeSlide === 0} className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50">
+                                    <Icon path="M15.75 19.5L8.25 12l7.5-7.5" className="w-5 h-5"/>
+                                 </button>
+                                 <span className="text-sm text-gray-600">{activeSlide + 1} / {content.slides.length}</span>
+                                 <button onClick={() => setActiveSlide(p => Math.min(content.slides.length - 1, p + 1))} disabled={activeSlide === content.slides.length - 1} className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50">
+                                    <Icon path="M8.25 4.5l7.5 7.5-7.5 7.5" className="w-5 h-5"/>
+                                 </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="mb-6">
+                                <h3 className="text-xl font-semibold text-gray-700 mb-2">Summary</h3>
+                                <p className="text-gray-600 text-sm">{content.summary}</p>
+                            </div>
+                            <div className="mb-6">
+                                <h3 className="text-xl font-semibold text-gray-700 mb-3">Highlights</h3>
+                                <ul className="space-y-2">
+                                    {content.highlights.map((highlight, i) => (
+                                        <li key={i} className="flex items-start space-x-2">
+                                            <Icon path="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                                            <span className="text-gray-600 text-sm">{highlight}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                            {content.insights && content.insights.labels && content.insights.labels.length > 0 && (
+                                <div>
+                                    <h3 className="text-xl font-semibold text-gray-700 mb-2">Insights</h3>
+                                    {/* 4. Render a canvas element and pass the ref to it */}
+                                    <div className="w-full h-64 mx-auto">
+                                       <canvas ref={chartRef}></canvas>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const RecentProjects = () => (
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mt-8">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-semibold text-gray-800">Recent Projects</h2>
+                    <button className="text-sm text-blue-600 font-medium">View All</button>
+                </div>
+                <div className="text-center py-12">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full mx-auto flex items-center justify-center">
+                        <Icon path="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <p className="text-gray-500 mt-4">No projects yet. Upload a document to get started.</p>
+                </div>
+            </div>
+        );
+
+        const ApiError = ({ message }) => (
+            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mt-8" role="alert">
+                <p className="font-bold">An Error Occurred</p>
+                <p>{message}</p>
+            </div>
+        );
+
+        const PromptGenerator = ({ prompt, setPrompt }) => {
+            const [presentationType, setPresentationType] = useState('');
+            const [audience, setAudience] = useState('');
+            const [keyInfo, setKeyInfo] = useState('');
+
+            const generatePrompt = () => {
+                let generated = `Generate a ${presentationType} presentation.`;
+                if (audience) {
+                    generated += ` The target audience is ${audience}.`;
+                }
+                if (keyInfo) {
+                    generated += ` Focus on the following key information: ${keyInfo}.`;
+                }
+                setPrompt(generated);
+            };
+
+            return (
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                    <h2 className="text-lg font-semibold text-gray-800 mb-4">Refine Your Presentation</h2>
+                    <div className="space-y-4">
+                        <div>
+                            <label htmlFor="presentation-type" className="block text-sm font-medium text-gray-700 mb-1">Type of Presentation</label>
+                            <input
+                                type="text"
+                                id="presentation-type"
+                                value={presentationType}
+                                onChange={(e) => setPresentationType(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="e.g., Sales Pitch, Quarterly Review"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="audience" className="block text-sm font-medium text-gray-700 mb-1">Target Audience</label>
+                            <input
+                                type="text"
+                                id="audience"
+                                value={audience}
+                                onChange={(e) => setAudience(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="e.g., C-level Executives, Technical Team"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="key-info" className="block text-sm font-medium text-gray-700 mb-1">Key Information to Highlight</label>
+                            <textarea
+                                id="key-info"
+                                value={keyInfo}
+                                onChange={(e) => setKeyInfo(e.target.value)}
+                                rows="3"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="e.g., Revenue growth, new market opportunities"
+                            ></textarea>
+                        </div>
+                        <button
+                            onClick={generatePrompt}
+                            className="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            Generate and Lock Prompt
+                        </button>
+                        {prompt && (
+                            <div className="bg-gray-100 p-4 rounded-lg mt-4">
+                                <p className="text-sm font-medium text-gray-800">Generated Prompt:</p>
+                                <p className="text-sm text-gray-600">{prompt}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+
+        const Footer = () => (
+            <footer className="bg-gray-50 mt-16">
+                <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
+                        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col items-center text-center">
+                            <div className="bg-blue-100 p-3 rounded-full mb-4">
+                                <Icon path="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.624l-.219.672-.219-.672a1.5 1.5 0 00-1.028-1.028l-.672-.219.672-.219a1.5 1.5 0 001.028-1.028l.219-.672.219.672a1.5 1.5 0 001.028 1.028l.672.219-.672.219a1.5 1.5 0 00-1.028 1.028z" className="w-8 h-8 text-blue-600" />
+                            </div>
+                            <h3 className="font-semibold text-gray-800">AI-Powered Analysis</h3>
+                            <p className="text-sm text-gray-500 mt-1">Advanced algorithms extract key insights and trends from your business data automatically.</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col items-center text-center">
+                            <div className="bg-green-100 p-3 rounded-full mb-4">
+                                <Icon path="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5A2.25 2.25 0 000 5.25v11.25A2.25 2.25 0 002.25 18.75h15.5A2.25 2.25 0 0020 16.5v-1.5M3.75 3h15A2.25 2.25 0 0121 5.25v4.5M3.75 3v4.5m0-4.5h1.5m-1.5 0h-1.5m1.5 0v4.5m0-4.5h1.5m0 0h1.5m0 0v4.5m0-4.5h1.5m0 0h1.5m0 0v4.5m0-4.5h1.5m0 0h1.5m0 0v4.5m0-4.5h1.5" className="w-8 h-8 text-green-600" />
+                            </div>
+                            <h3 className="font-semibold text-gray-800">Smart Visualizations</h3>
+                            <p className="text-sm text-gray-500 mt-1">Generate professional charts and graphs that highlight the most important business metrics.</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col items-center text-center">
+                            <div className="bg-purple-100 p-3 rounded-full mb-4">
+                                <Icon path="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" className="w-8 h-8 text-purple-600" />
+                            </div>
+                            <h3 className="font-semibold text-gray-800">One-Click Export</h3>
+                            <p className="text-sm text-gray-500 mt-1">Export your presentations in PowerPoint, PDF, or Google Slides format with a single click.</p>
+                        </div>
+                    </div>
+                    <div className="mt-12 border-t border-gray-200 pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-gray-500">
+                        <div className="flex items-center space-x-2 mb-4 md:mb-0">
+                            <div className="bg-blue-600 p-1 rounded">
+                                <Icon path="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-1.621-1.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h9.75a2.25 2.25 0 012.25 2.25z" className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="font-bold">BoardBrief AI</span>
+                        </div>
+                        <div className="flex space-x-6">
+                            <a href="#" className="hover:text-gray-900">Privacy Policy</a>
+                            <a href="#" className="hover:text-gray-900">Terms of Service</a>
+                            <a href="#" className="hover:text-gray-900">Support</a>
+                            <a href="#" className="hover:text-gray-900">API Documentation</a>
+                        </div>
+                    </div>
+                    <div className="mt-8 text-center text-xs text-gray-400">
+                        <p>&copy; 2025 BoardBrief AI. All rights reserved. | Powered by Gemini</p>
+                    </div>
+                </div>
+            </footer>
+        );
+
+        function App() {
+            const [projectName, setProjectName] = useState('Q3 Financial Performance');
+            const [selectedTemplate, setSelectedTemplate] = useState('Executive Summary');
+            const [files, setFiles] = useState([]);
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [generatedContent, setGeneratedContent] = useState(null);
+            const [apiError, setApiError] = useState(null);
+            const [prompt, setPrompt] = useState('');
+
+            return (
+                <div className="bg-gray-50 min-h-screen">
+                    <Header />
+                    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                        <div className="space-y-8">
+                            <h1 className="text-3xl font-bold text-gray-900">Transform Documents into Executive Presentations</h1>
+                            <p className="text-lg text-gray-600">Upload your business documents and let AI create boardroom-ready slide decks in minutes.</p>
+                            
+                            <ProjectNameInput projectName={projectName} setProjectName={setProjectName} />
+                            <PresentationTemplates selectedTemplate={selectedTemplate} setSelectedTemplate={setSelectedTemplate} />
+                            <PromptGenerator prompt={prompt} setPrompt={setPrompt} />
+                            <FileUpload 
+                                setFiles={setFiles} 
+                                setProcessing={setIsProcessing} 
+                                setGeneratedContent={setGeneratedContent} 
+                                setApiError={setApiError}
+                                prompt={prompt}
+                            />
+
+                            {apiError && <ApiError message={apiError} />}
+                            {isProcessing && <ProcessingStatus />}
+                            {generatedContent && <GeneratedContent content={generatedContent} />}
+                            {!isProcessing && !generatedContent && !apiError && <RecentProjects />}
+                        </div>
+                    </main>
+                    <Footer />
+                </div>
+            );
+        }
+
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
+    </script>
+    {% endraw %}
+
+</body>
+</html>
